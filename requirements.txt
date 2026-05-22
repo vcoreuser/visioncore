@@ -1,0 +1,7 @@
+uiautomator2==3.2.1
+adbutils                 
+numpy                     
+openai                    
+pandas 
+pygments
+construct
