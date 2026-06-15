@@ -51,7 +51,6 @@ FINISHED = "task_completed"
 MAX_SCROLL_NUM = 7
 # USE_LMQL = False
 
-print("MODIFIED input_policy.py LOADED")
 class InputInterruptedException(Exception):
     pass
 
@@ -62,10 +61,6 @@ def safe_dict_get(view_dict, key, default=None):
     return return_itm
 
 class InputPolicy(object):
-    """
-    This class is responsible for generating events to stimulate more app behaviour
-    It should call AppEventManager.send_event method continuously
-    """
 
     def __init__(self, device:Device, app:App, output_dir):
         self.logger = logging.getLogger(self.__class__.__name__)
@@ -239,22 +234,6 @@ class TaskPolicy(UtgBasedInputPolicy):
         action, candidate_actions, target_view, thought = self._get_action_from_views_actions(
             current_state=current_state, action_history=self.__action_history, thought_history=self.__thought_history, state_strs=current_state.state_str)
         
-        if action == FINISHED:
-            print("Total Baseline Tokens:", self.total_baseline_tokens)
-            print("Total CORE Tokens:", self.total_core_tokens)
-
-            if self.total_baseline_tokens > 0:
-                reduction = (
-                        (self.total_baseline_tokens - self.total_core_tokens)
-                        / self.total_baseline_tokens
-                        * 100
-                )
-                print("Token Reduction Rate:", reduction, "%")
-            else:
-                print("No baseline token data recorded.")
-            print("=================================")
-            return None, FINISHED
-
         if action is None:
             return None, None
         if action is not None:
@@ -305,14 +284,12 @@ class TaskPolicy(UtgBasedInputPolicy):
         image_path = os.path.join(self.output_dir, f"{self.action_count}.png")
 
         if current_state:
-            # Prepare XML data for Baseline RR calculation and Locator mapping
+            
             minified, pretty = current_state.process_xml()
             all_list, important_map, leaf_ancestors_map, results, readable_results, candidate_actions = current_state.extract_info_from_xml(
                 pretty)
             important_list = [value for key, value in important_map.items()]
 
-            # --- PHASE 1: CO-PLANNING (Local LLaVA) ---
-            # Ask LLaVA to look at the screenshot and propose sub-tasks
             subtask_prompt = self.prompt_local_LLM_generate_subtasks(self.task, action_history)
             several_options = tools.query_local_LLM(subtask_prompt, image_path)
 
@@ -325,10 +302,7 @@ class TaskPolicy(UtgBasedInputPolicy):
             # --- PHASE 2: CO-DECISION-MAKING (Cloud GPT-4o) ---
             decision_prompt = prompt_LLM_current_task(self.task, action_history, several_options)
 
-            # --- RR (Token Reduction) Calculation ---
-            baseline_prompt_str = prompt_LLM_current_task(self.task, action_history, "\n".join(important_list))
-            self.total_baseline_tokens += len(self.tokenizer.encode(baseline_prompt_str))
-            self.total_baseline += len(important_list)
+            
 
             # CORE:LLaVA's summary
             self.total_core_tokens += len(self.tokenizer.encode(decision_prompt))
